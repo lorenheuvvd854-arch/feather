@@ -1,0 +1,884 @@
+name: Build redesigned IPA
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/build-redesign.yml'
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Apply prepared source changes
+        shell: bash
+        run: |
+          git apply <<'FEATHER_PATCH'
+          diff --git a/.github/workflows/test-nimble-json.yml b/.github/workflows/test-nimble-json.yml
+          new file mode 100644
+          index 0000000..64fe1eb
+          --- /dev/null
+          +++ b/.github/workflows/test-nimble-json.yml
+          @@ -0,0 +1,27 @@
+          +name: NimbleJSON regression tests
+          +
+          +on:
+          +  push:
+          +    paths:
+          +      - 'NimbleKit/Sources/NimbleJSON/**'
+          +      - 'NimbleKit/Tests/NimbleJSONRegression/**'
+          +      - 'scripts/test-nimble-json.sh'
+          +      - '.github/workflows/test-nimble-json.yml'
+          +  pull_request:
+          +    paths:
+          +      - 'NimbleKit/Sources/NimbleJSON/**'
+          +      - 'NimbleKit/Tests/NimbleJSONRegression/**'
+          +      - 'scripts/test-nimble-json.sh'
+          +      - '.github/workflows/test-nimble-json.yml'
+          +  workflow_dispatch:
+          +
+          +permissions:
+          +  contents: read
+          +
+          +jobs:
+          +  test:
+          +    runs-on: macos-latest
+          +    steps:
+          +      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+          +      - name: Test HTTP response handling without network access
+          +        run: bash scripts/test-nimble-json.sh
+          diff --git a/Feather/Views/Common/FRDesign.swift b/Feather/Views/Common/FRDesign.swift
+          new file mode 100644
+          index 0000000..931536d
+          --- /dev/null
+          +++ b/Feather/Views/Common/FRDesign.swift
+          @@ -0,0 +1,135 @@
+          +import SwiftUI
+          +
+          +// Semantic system colors preserve the user's appearance and accent settings.
+          +struct FRCardStyle: ViewModifier {
+          +	@Environment(\.colorSchemeContrast) private var contrast
+          +
+          +	func body(content: Content) -> some View {
+          +		content
+          +			.background(Color(uiColor: .secondarySystemGroupedBackground))
+          +			.clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+          +			.overlay {
+          +				RoundedRectangle(cornerRadius: 22, style: .continuous)
+          +					.strokeBorder(Color.primary.opacity(contrast == .increased ? 0.35 : 0.08))
+          +			}
+          +	}
+          +}
+          +
+          +struct FRDashboardView: View {
+          +	let title: String
+          +	let subtitle: String
+          +	let symbol: String
+          +	let statistics: [(title: String, value: Int)]
+          +
+          +	var body: some View {
+          +		VStack(alignment: .leading, spacing: 20) {
+          +			Image(systemName: symbol)
+          +				.font(.title2.weight(.semibold))
+          +				.foregroundStyle(Color.accentColor)
+          +				.padding(13)
+          +				.background(Color.accentColor.opacity(0.12), in: RoundedRectangle(cornerRadius: 17))
+          +				.accessibilityHidden(true)
+          +
+          +			VStack(alignment: .leading, spacing: 6) {
+          +				Text(title)
+          +					.font(.system(.title, design: .rounded, weight: .bold))
+          +					.foregroundStyle(.primary)
+          +				Text(subtitle)
+          +					.font(.subheadline)
+          +					.foregroundStyle(.secondary)
+          +					.fixedSize(horizontal: false, vertical: true)
+          +			}
+          +
+          +			ViewThatFits(in: .horizontal) {
+          +				HStack(alignment: .top, spacing: 24) { _statistics }
+          +				VStack(alignment: .leading, spacing: 12) { _statistics }
+          +			}
+          +		}
+          +		.frame(maxWidth: .infinity, alignment: .leading)
+          +		.padding(22)
+          +		.background {
+          +			LinearGradient(colors: [Color.accentColor.opacity(0.09), .clear],
+          +			               startPoint: .topTrailing, endPoint: .bottomLeading)
+          +		}
+          +		.modifier(FRCardStyle())
+          +	}
+          +
+          +	private var _statistics: some View {
+          +		ForEach(statistics.indices, id: \.self) { index in
+          +			VStack(alignment: .leading, spacing: 3) {
+          +				Text(statistics[index].value, format: .number)
+          +					.font(.system(.title2, design: .rounded, weight: .bold))
+          +					.monospacedDigit()
+          +				Text(statistics[index].title)
+          +					.font(.caption.weight(.medium))
+          +					.foregroundStyle(.secondary)
+          +			}
+          +			.fixedSize()
+          +			.accessibilityElement(children: .combine)
+          +		}
+          +	}
+          +}
+          +
+          +struct FREmptyStateView<Action: View>: View {
+          +	let title: String
+          +	let message: String
+          +	let symbol: String
+          +	private let action: () -> Action
+          +
+          +	init(title: String, message: String, symbol: String, @ViewBuilder action: @escaping () -> Action) {
+          +		self.title = title
+          +		self.message = message
+          +		self.symbol = symbol
+          +		self.action = action
+          +	}
+          +
+          +	var body: some View {
+          +		VStack(spacing: 14) {
+          +			Image(systemName: symbol)
+          +				.font(.largeTitle)
+          +				.foregroundStyle(Color.accentColor)
+          +				.accessibilityHidden(true)
+          +			Text(title).font(.title3.bold())
+          +			Text(message)
+          +				.font(.subheadline)
+          +				.foregroundStyle(.secondary)
+          +				.multilineTextAlignment(.center)
+          +			action().buttonStyle(.borderedProminent).controlSize(.large)
+          +		}
+          +		.frame(maxWidth: .infinity)
+          +		.padding(28)
+          +		.modifier(FRCardStyle())
+          +	}
+          +}
+          +
+          +#if DEBUG
+          +struct FRDesign_Previews: PreviewProvider {
+          +	static var previews: some View {
+          +		Group {
+          +			_preview.preferredColorScheme(.light).previewDisplayName("Light")
+          +			_preview.preferredColorScheme(.dark).previewDisplayName("Dark")
+          +			_preview.dynamicTypeSize(.accessibility3).previewDisplayName("Large text")
+          +		}
+          +	}
+          +
+          +	private static var _preview: some View {
+          +		ScrollView {
+          +			VStack(spacing: 16) {
+          +				FRDashboardView(
+          +					title: "Your apps, organized.",
+          +					subtitle: "Import, sign, and install in one place.",
+          +					symbol: "square.stack.3d.up.fill",
+          +					statistics: [("Signed", 12), ("Imported", 4)]
+          +				)
+          +				FREmptyStateView(
+          +					title: "No Apps",
+          +					message: "Get started by importing your first IPA file.",
+          +					symbol: "square.and.arrow.down"
+          +				) { Button("Import") {} }
+          +			}
+          +			.padding()
+          +		}
+          +		.background(Color(uiColor: .systemGroupedBackground))
+          +	}
+          +}
+          +#endif
+          diff --git a/Feather/Views/Common/FRExpirationPillView.swift b/Feather/Views/Common/FRExpirationPillView.swift
+          index fa8ba1e..ee1c8b3 100644
+          --- a/Feather/Views/Common/FRExpirationPillView.swift
+          +++ b/Feather/Views/Common/FRExpirationPillView.swift
+          @@ -18,20 +18,21 @@ struct FRExpirationPillView: View {
+           			? .localized("Revoked")
+           			: expiration?.formatted ?? title
+           		
+          -		let textForeground = (expiration == nil)
+          +		let textForeground = (expiration == nil && !revoked)
+           			? Color.accentColor
+           			: .white
+           		
+           		let textBackground = revoked
+           			? .red
+          -			: expiration?.color.opacity(0.85) ?? Color(uiColor: .quaternarySystemFill)
+          +			: expiration?.color.opacity(0.85) ?? Color.accentColor.opacity(0.12)
+           		
+           		Text(textLabel)
+           			.lineLimit(0)
+          -			.font(.headline.bold())
+          +			.font(.subheadline.weight(.semibold))
+           			.foregroundStyle(textForeground)
+           			.padding(.horizontal, 12)
+          -			.padding(.vertical, 6)
+          +			.padding(.vertical, 10)
+          +			.frame(minWidth: 64, minHeight: 44)
+           			.background(textBackground)
+           			.clipShape(Capsule())
+           	}
+          diff --git a/Feather/Views/Library/LibraryCellView.swift b/Feather/Views/Library/LibraryCellView.swift
+          index 9383261..2897b7b 100644
+          --- a/Feather/Views/Library/LibraryCellView.swift
+          +++ b/Feather/Views/Library/LibraryCellView.swift
+          @@ -11,7 +11,7 @@ import NimbleViews
+           
+           // MARK: - View
+           struct LibraryCellView: View {
+          -	@Environment(\.horizontalSizeClass) private var horizontalSizeClass
+          +	@Environment(\.dynamicTypeSize) private var dynamicTypeSize
+           	@Environment(\.editMode) private var editMode
+           	@ObservedObject private var updateManager = UpdateManager.shared
+           	@State private var _signedUpdateConfirmation: AppUpdate?
+          @@ -48,7 +48,6 @@ struct LibraryCellView: View {
+           	
+           	// MARK: Body
+           	var body: some View {
+          -		let isRegular = horizontalSizeClass != .compact
+           		let isEditing = editMode?.wrappedValue == .active
+           		
+           		HStack(spacing: 18) {
+          @@ -65,23 +64,34 @@ struct LibraryCellView: View {
+           			
+           			_appIcon(for: app)
+           			
+          -			NBTitleWithSubtitleView(
+          -				title: app.name ?? .localized("Unknown"),
+          -				subtitle: _desc,
+          -				linelimit: 0
+          -			)
+          -			
+          -			if !isEditing {
+          +			VStack(alignment: .leading, spacing: 5) {
+          +				Text(app.name ?? .localized("Unknown"))
+          +					.font(.headline)
+          +					.foregroundStyle(.primary)
+          +				Text(app.version ?? .localized("Unknown"))
+          +					.font(.subheadline.weight(.medium))
+          +					.foregroundStyle(.secondary)
+          +				if let identifier = app.identifier {
+          +					Text(identifier)
+          +						.font(.caption)
+          +						.foregroundStyle(.secondary)
+          +						.lineLimit(2)
+          +						.truncationMode(.middle)
+          +				}
+          +				if !isEditing && dynamicTypeSize.isAccessibilitySize {
+          +					_buttonActions(for: app).padding(.top, 6)
+          +				}
+          +			}
+          +			.frame(maxWidth: .infinity, alignment: .leading)
+          +
+          +			if !isEditing && !dynamicTypeSize.isAccessibilitySize {
+           				_buttonActions(for: app)
+           			}
+           		}
+          -		.padding(isRegular ? 12 : 0)
+          -		.background(
+          -			isRegular
+          -				? RoundedRectangle(cornerRadius: 18, style: .continuous)
+          -				.fill(_isSelected && isEditing ? Color.accentColor.opacity(0.1) : Color(.quaternarySystemFill))
+          -				: nil
+          -		)
+          +		.padding(16)
+          +		.modifier(FRCardStyle())
+          +		.listRowBackground(Color.clear)
+          +		.listRowSeparator(.hidden)
+           		.contentShape(Rectangle())
+           		.onTapGesture {
+           			if isEditing {
+          @@ -123,20 +133,13 @@ struct LibraryCellView: View {
+           		}
+           	}
+           	
+          -	private var _desc: String {
+          -		if let version = app.version, let id = app.identifier {
+          -			return "\(version) • \(id)"
+          -		} else {
+          -			return .localized("Unknown")
+          -		}
+          -	}
+           }
+           
+           
+           // MARK: - Extension: View
+           extension LibraryCellView {
+           	private func _appIcon(for app: AppInfoPresentable) -> some View {
+          -		FRAppIconView(app: app, size: 57)
+          +		FRAppIconView(app: app, size: 62)
+           			.overlay(alignment: .topTrailing) {
+           				if updateManager.update(for: app) != nil {
+           					Image(systemName: "arrow.down.circle.fill")
+          diff --git a/Feather/Views/Library/LibraryView.swift b/Feather/Views/Library/LibraryView.swift
+          index b9c3aee..c679473 100644
+          --- a/Feather/Views/Library/LibraryView.swift
+          +++ b/Feather/Views/Library/LibraryView.swift
+          @@ -72,6 +72,48 @@ struct LibraryView: View {
+           	var body: some View {
+           		NBNavigationView(.localized("Library")) {
+           			NBListAdaptable {
+          +				if _searchText.isEmpty && _selectedScope == .all {
+          +					Section {
+          +						VStack(spacing: 12) {
+          +							FRDashboardView(
+          +								title: .localized("Your apps, organized."),
+          +								subtitle: .localized("Import, sign, and install in one place."),
+          +								symbol: "square.stack.3d.up.fill",
+          +								statistics: [
+          +									(.localized("Signed"), _signedApps.count),
+          +									(.localized("Imported"), _importedApps.count)
+          +								]
+          +							)
+          +							Menu { _importActions() } label: {
+          +								Label(.localized("Import"), systemImage: "plus.circle.fill")
+          +									.font(.headline)
+          +									.frame(maxWidth: .infinity, minHeight: 36)
+          +							}
+          +							.buttonStyle(.borderedProminent)
+          +							.controlSize(.large)
+          +						}
+          +						.listRowBackground(Color.clear)
+          +						.listRowSeparator(.hidden)
+          +					}
+          +				}
+          +
+          +				if _getAllApps().isEmpty {
+          +					Section {
+          +						FREmptyStateView(
+          +							title: .localized(_searchText.isEmpty ? "No Apps" : "No Results"),
+          +							message: .localized(_searchText.isEmpty
+          +								? "Get started by importing your first IPA file."
+          +								: "Try a different search or filter."),
+          +							symbol: _searchText.isEmpty ? "square.and.arrow.down" : "magnifyingglass"
+          +						) {
+          +							if _searchText.isEmpty {
+          +								Menu { _importActions() } label: { Text(.localized("Import")) }
+          +							}
+          +						}
+          +						.listRowBackground(Color.clear)
+          +						.listRowSeparator(.hidden)
+          +					}
+          +				}
+           				if
+           					!_filteredSignedApps.isEmpty,
+           					_selectedScope == .all || _selectedScope == .signed
+          @@ -114,6 +156,8 @@ struct LibraryView: View {
+           					}
+           				}
+           			}
+          +			.scrollContentBackground(.hidden)
+          +			.background(Color(uiColor: .systemGroupedBackground))
+           			.searchable(text: $_searchText, placement: .platform())
+           			.compatSearchScopes($_selectedScope) {
+           				ForEach(Scope.allCases, id: \.displayName) { scope in
+          @@ -121,26 +165,6 @@ struct LibraryView: View {
+           				}
+           			}
+           			.scrollDismissesKeyboard(.interactively)
+          -			.overlay {
+          -				if
+          -					_filteredSignedApps.isEmpty,
+          -					_filteredImportedApps.isEmpty
+          -				{
+          -					if #available(iOS 17, *) {
+          -						ContentUnavailableView {
+          -							Label(.localized("No Apps"), systemImage: "questionmark.app.fill")
+          -						} description: {
+          -							Text(.localized("Get started by importing your first IPA file."))
+          -						} actions: {
+          -							Menu {
+          -								_importActions()
+          -							} label: {
+          -								NBButton(.localized("Import"), style: .text)
+          -							}
+          -						}
+          -					}
+          -				}
+          -			}
+           			.toolbar {
+           				ToolbarItem(placement: .topBarLeading) {
+           					EditButton()
+          diff --git a/Feather/Views/Settings/SettingsView.swift b/Feather/Views/Settings/SettingsView.swift
+          index 2de8b28..299501f 100644
+          --- a/Feather/Views/Settings/SettingsView.swift
+          +++ b/Feather/Views/Settings/SettingsView.swift
+          @@ -41,6 +41,16 @@ struct SettingsView: View {
+           	var body: some View {
+           		NBNavigationView(.localized("Settings")) {
+           			Form {
+          +				Section {
+          +					FRDashboardView(
+          +						title: .localized("Make it yours."),
+          +						subtitle: .localized("Your look. Your signing setup."),
+          +						symbol: "slider.horizontal.3",
+          +						statistics: [(.localized("Certificates"), _certificates.count)]
+          +					)
+          +					.listRowInsets(EdgeInsets())
+          +					.listRowBackground(Color.clear)
+          +				}
+           				#if !NIGHTLY && !DEBUG
+           					SettingsDonationCellView(site: _donationsUrl)
+           				#endif
+          diff --git a/Feather/Views/Sources/SourcesCellView.swift b/Feather/Views/Sources/SourcesCellView.swift
+          index 504ac12..81896d8 100644
+          --- a/Feather/Views/Sources/SourcesCellView.swift
+          +++ b/Feather/Views/Sources/SourcesCellView.swift
+          @@ -11,26 +11,23 @@ import NukeUI
+           
+           // MARK: - View
+           struct SourcesCellView: View {
+          -	@Environment(\.horizontalSizeClass) private var horizontalSizeClass
+           	
+           	var source: AltSource
+           	
+           	// MARK: Body
+           	var body: some View {
+          -		let isRegular = horizontalSizeClass != .compact
+           		
+           		FRIconCellView(
+           			title: source.name ?? .localized("Unknown"),
+          -			subtitle: source.sourceURL?.absoluteString ?? "",
+          -			iconUrl: source.iconURL
+          -		)
+          -		.padding(isRegular ? 12 : 0)
+          -		.background(
+          -			isRegular
+          -				? RoundedRectangle(cornerRadius: 18, style: .continuous)
+          -				.fill(Color(.quaternarySystemFill))
+          -				: nil
+          +			subtitle: source.sourceURL?.host ?? source.sourceURL?.absoluteString ?? "",
+          +			iconUrl: source.iconURL,
+          +			size: 60
+           		)
+          +		.foregroundStyle(.primary)
+          +		.padding(16)
+          +		.modifier(FRCardStyle())
+          +		.listRowBackground(Color.clear)
+          +		.listRowSeparator(.hidden)
+           		.swipeActions {
+           			_actions(for: source)
+           			_contextActions(for: source)
+          diff --git a/Feather/Views/Sources/SourcesView.swift b/Feather/Views/Sources/SourcesView.swift
+          index 766cafb..59c60e9 100644
+          --- a/Feather/Views/Sources/SourcesView.swift
+          +++ b/Feather/Views/Sources/SourcesView.swift
+          @@ -12,7 +12,6 @@ import NimbleViews
+           
+           // MARK: - View
+           struct SourcesView: View {
+          -	@Environment(\.horizontalSizeClass) private var horizontalSizeClass
+           	#if !NIGHTLY && !DEBUG
+           		@AppStorage("Feather.shouldStar") private var _shouldStar: Int = 0
+           	#endif
+          @@ -35,28 +34,59 @@ struct SourcesView: View {
+           	var body: some View {
+           		NBNavigationView(.localized("Sources")) {
+           			NBListAdaptable {
+          +				if _searchText.isEmpty {
+          +					Section {
+          +						FRDashboardView(
+          +							title: .localized("Discover your next app."),
+          +							subtitle: .localized("All your trusted sources, together."),
+          +							symbol: "globe",
+          +							statistics: [(.localized("Repositories"), _sources.count)]
+          +						)
+          +						.listRowBackground(Color.clear)
+          +						.listRowSeparator(.hidden)
+          +					}
+          +				}
+          +
+          +				if _filteredSources.isEmpty {
+          +					Section {
+          +						FREmptyStateView(
+          +							title: .localized(_searchText.isEmpty ? "No Repositories" : "No Results"),
+          +							message: .localized(_searchText.isEmpty
+          +								? "Get started by adding your first repository."
+          +								: "Try a different search or filter."),
+          +							symbol: _searchText.isEmpty ? "globe" : "magnifyingglass"
+          +						) {
+          +							if _searchText.isEmpty {
+          +								Button(.localized("Add Source")) { _isAddingPresenting = true }
+          +							}
+          +						}
+          +						.listRowBackground(Color.clear)
+          +						.listRowSeparator(.hidden)
+          +					}
+          +				}
+           				if !_filteredSources.isEmpty {
+           					Section {
+           						NavigationLink {
+           							SourceAppsView(object: Array(_sources), viewModel: viewModel)
+           						} label: {
+          -							let isRegular = horizontalSizeClass != .compact
+          -							HStack(spacing: 18) {
+          -								Image("Repositories").appIconStyle()
+          -								NBTitleWithSubtitleView(
+          -									title: .localized("All Repositories"),
+          -									subtitle: .localized("See all apps from your sources")
+          -								)
+          +							HStack(spacing: 14) {
+          +								Image(systemName: "square.grid.2x2.fill")
+          +									.font(.title2)
+          +									.foregroundStyle(Color.accentColor)
+          +								VStack(alignment: .leading, spacing: 4) {
+          +									Text(.localized("All Repositories")).font(.headline)
+          +									Text(.localized("See all apps from your sources"))
+          +										.font(.subheadline).foregroundStyle(.secondary)
+          +								}
+          +								.frame(maxWidth: .infinity, alignment: .leading)
+           							}
+          -							.padding(isRegular ? 12 : 0)
+          -							.background(
+          -								isRegular
+          -									? RoundedRectangle(cornerRadius: 18, style: .continuous)
+          -									.fill(Color(.quaternarySystemFill))
+          -									: nil
+          -							)
+          +							.foregroundStyle(.primary)
+          +							.padding(20)
+          +							.modifier(FRCardStyle())
+           						}
+           						.buttonStyle(.plain)
+          +						.listRowBackground(Color.clear)
+          +						.listRowSeparator(.hidden)
+           					}
+           					
+           					NBSection(
+          @@ -70,28 +100,15 @@ struct SourcesView: View {
+           								SourcesCellView(source: source)
+           							}
+           							.buttonStyle(.plain)
+          +							.listRowBackground(Color.clear)
+          +							.listRowSeparator(.hidden)
+           						}
+           					}
+           				}
+           			}
+          +			.scrollContentBackground(.hidden)
+          +			.background(Color(uiColor: .systemGroupedBackground))
+           			.searchable(text: $_searchText, placement: .platform())
+          -			.overlay {
+          -				if _filteredSources.isEmpty {
+          -					if #available(iOS 17, *) {
+          -						ContentUnavailableView {
+          -							Label(.localized("No Repositories"), systemImage: "globe.desk.fill")
+          -						} description: {
+          -							Text(.localized("Get started by adding your first repository."))
+          -						} actions: {
+          -							Button {
+          -								_isAddingPresenting = true
+          -							} label: {
+          -								NBButton(.localized("Add Source"), style: .text)
+          -							}
+          -						}
+          -					}
+          -				}
+          -			}
+           			.toolbar {
+           				NBToolbarButton(
+           					systemImage: "plus",
+          diff --git a/Feather/Views/TabView/TabEnum.swift b/Feather/Views/TabView/TabEnum.swift
+          index 91c17fc..b9006fe 100644
+          --- a/Feather/Views/TabView/TabEnum.swift
+          +++ b/Feather/Views/TabView/TabEnum.swift
+          @@ -25,9 +25,9 @@ enum TabEnum: String, CaseIterable, Hashable {
+           	
+           	var icon: String {
+           		switch self {
+          -		case .sources: 		return "globe.desk"
+          -		case .library: 		return "square.grid.2x2"
+          -		case .settings: 	return "gearshape.2"
+          +		case .sources: 		return "globe"
+          +		case .library: 		return "square.stack.3d.up.fill"
+          +		case .settings: 	return "slider.horizontal.3"
+           		case .certificates: return "person.text.rectangle"
+           		}
+           	}
+          diff --git a/NimbleKit/Sources/NimbleJSON/NBFetchService.swift b/NimbleKit/Sources/NimbleJSON/NBFetchService.swift
+          index 9bfc6cb..f6a63a2 100644
+          --- a/NimbleKit/Sources/NimbleJSON/NBFetchService.swift
+          +++ b/NimbleKit/Sources/NimbleJSON/NBFetchService.swift
+          @@ -13,6 +13,7 @@ public class NBFetchService {
+           	public enum NBFetchServiceError: Error, LocalizedError {
+           		case invalidURL
+           		case networkError(Error)
+          +		case httpError(Int)
+           		case noData
+           		case parsingError(Error)
+           		
+          @@ -20,13 +21,18 @@ public class NBFetchService {
+           			switch self {
+           			case .invalidURL: "The URL is invalid."
+           			case .networkError(let error): "Network error: \(error.localizedDescription)"
+          +			case .httpError(let statusCode): "HTTP error: \(statusCode) (\(HTTPURLResponse.localizedString(forStatusCode: statusCode)))."
+           			case .noData: "No data received."
+           			case .parsingError(let error): "Failed to parse data: \(error.localizedDescription)"
+           			}
+           		}
+           	}
+           	
+          -	public init() {}
+          +	private let session: URLSession
+          +
+          +	public init(session: URLSession = .shared) {
+          +		self.session = session
+          +	}
+           }
+           
+           // MARK: - Class extension: fetch
+          @@ -48,13 +54,19 @@ extension NBFetchService {
+           		completion: @escaping (Result<T, Error>) -> Void
+           	) {
+           		DispatchQueue.global(qos: .userInitiated).async {
+          -			let task = URLSession.shared.dataTask(with: url) { data, response, error in
+          +			let task = self.session.dataTask(with: url) { data, response, error in
+           				if let error = error {
+           					completion(.failure(NBFetchServiceError.networkError(error)))
+           					return
+           				}
+           				
+          -				guard let data = data else {
+          +				if let response = response as? HTTPURLResponse,
+          +				   !(200..<300).contains(response.statusCode) {
+          +					completion(.failure(NBFetchServiceError.httpError(response.statusCode)))
+          +					return
+          +				}
+          +
+          +				guard let data = data, !data.isEmpty else {
+           					completion(.failure(NBFetchServiceError.noData))
+           					return
+           				}
+          diff --git a/NimbleKit/Tests/NimbleJSONRegression/main.swift b/NimbleKit/Tests/NimbleJSONRegression/main.swift
+          new file mode 100644
+          index 0000000..e434998
+          --- /dev/null
+          +++ b/NimbleKit/Tests/NimbleJSONRegression/main.swift
+          @@ -0,0 +1,152 @@
+          +import Foundation
+          +import XCTest
+          +
+          +// Compile alongside NBFetchService.swift to test only the Foundation target.
+          +// Other NimbleKit products require UIKit and cannot run as macOS host tests.
+          +private final class StubURLProtocol: URLProtocol {
+          +	static var statusCode = 200
+          +	static var body = Data()
+          +	static var error: Error?
+          +	static var isHTTP = true
+          +
+          +	override class func canInit(with request: URLRequest) -> Bool { true }
+          +	override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+          +	override func stopLoading() {}
+          +
+          +	override func startLoading() {
+          +		if let error = Self.error {
+          +			client?.urlProtocol(self, didFailWithError: error)
+          +			return
+          +		}
+          +		let response: URLResponse = Self.isHTTP
+          +			? HTTPURLResponse(url: request.url!, statusCode: Self.statusCode,
+          +			                  httpVersion: nil, headerFields: nil)!
+          +			: URLResponse(url: request.url!, mimeType: "application/json",
+          +			              expectedContentLength: Self.body.count, textEncodingName: nil)
+          +		client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+          +		client?.urlProtocol(self, didLoad: Self.body)
+          +		client?.urlProtocolDidFinishLoading(self)
+          +	}
+          +}
+          +
+          +final class FetchServiceTests: XCTestCase {
+          +	private struct Payload: Decodable { let name: String }
+          +	private var session: URLSession!
+          +	private var service: NBFetchService!
+          +
+          +	override func setUp() {
+          +		super.setUp()
+          +		StubURLProtocol.statusCode = 200
+          +		StubURLProtocol.body = Data(#"{"name":"Feather"}"#.utf8)
+          +		StubURLProtocol.error = nil
+          +		StubURLProtocol.isHTTP = true
+          +		let configuration = URLSessionConfiguration.ephemeral
+          +		configuration.protocolClasses = [StubURLProtocol.self]
+          +		session = URLSession(configuration: configuration)
+          +		service = NBFetchService(session: session)
+          +	}
+          +
+          +	override func tearDown() {
+          +		session.invalidateAndCancel()
+          +		service = nil
+          +		session = nil
+          +		super.tearDown()
+          +	}
+          +
+          +	private func fetch(_ check: @escaping (Result<Payload, Error>) -> Void) {
+          +		let completed = expectation(description: "Fetch completes exactly once")
+          +		completed.assertForOverFulfill = true
+          +		service.fetch(from: URL(string: "https://feather.invalid/source.json")!) {
+          +			(result: Result<Payload, Error>) in
+          +			check(result)
+          +			completed.fulfill()
+          +		}
+          +		wait(for: [completed], timeout: 5)
+          +	}
+          +
+          +	func testSuccess() {
+          +		fetch { result in
+          +			switch result {
+          +			case .success(let payload): XCTAssertEqual(payload.name, "Feather")
+          +			case .failure(let error): XCTFail("Unexpected error: \(error)")
+          +			}
+          +		}
+          +	}
+          +
+          +	func testOtherSuccessfulStatus() {
+          +		StubURLProtocol.statusCode = 201
+          +		testSuccess()
+          +	}
+          +
+          +	func testNonHTTPResponseStillWorks() {
+          +		StubURLProtocol.isHTTP = false
+          +		testSuccess()
+          +	}
+          +
+          +	func testHTTPErrorRejectsDecodableBody() {
+          +		for code in [199, 300, 401, 404, 429, 500, 503] {
+          +			StubURLProtocol.statusCode = code
+          +			fetch { result in
+          +				guard case .failure(let error) = result,
+          +				      case NBFetchService.NBFetchServiceError.httpError(let actual) = error else {
+          +					return XCTFail("Expected HTTP error \(code), got \(result)")
+          +				}
+          +				XCTAssertEqual(actual, code)
+          +			}
+          +		}
+          +	}
+          +
+          +	func testHTTPErrorTakesPriorityOverEmptyBody() {
+          +		StubURLProtocol.statusCode = 500
+          +		StubURLProtocol.body = Data()
+          +		fetch { result in
+          +			guard case .failure(let error) = result,
+          +			      case NBFetchService.NBFetchServiceError.httpError(500) = error else {
+          +				return XCTFail("Expected HTTP error, got \(result)")
+          +			}
+          +		}
+          +	}
+          +
+          +	func testEmptySuccessResponse() {
+          +		StubURLProtocol.statusCode = 204
+          +		StubURLProtocol.body = Data()
+          +		fetch { result in
+          +			guard case .failure(let error) = result,
+          +			      case NBFetchService.NBFetchServiceError.noData = error else {
+          +				return XCTFail("Expected noData, got \(result)")
+          +			}
+          +		}
+          +	}
+          +
+          +	func testMalformedJSON() {
+          +		StubURLProtocol.body = Data("not JSON".utf8)
+          +		fetch { result in
+          +			guard case .failure(let error) = result,
+          +			      case NBFetchService.NBFetchServiceError.parsingError = error else {
+          +				return XCTFail("Expected parsing error, got \(result)")
+          +			}
+          +		}
+          +	}
+          +
+          +	func testTransportError() {
+          +		StubURLProtocol.error = URLError(.notConnectedToInternet)
+          +		fetch { result in
+          +			guard case .failure(let error) = result,
+          +			      case NBFetchService.NBFetchServiceError.networkError(let underlying) = error else {
+          +				return XCTFail("Expected network error, got \(result)")
+          +			}
+          +			XCTAssertEqual((underlying as? URLError)?.code, .notConnectedToInternet)
+          +		}
+          +	}
+          +}
+          +
+          +XCTMain([testCase([
+          +	("testSuccess", FetchServiceTests.testSuccess),
+          +	("testOtherSuccessfulStatus", FetchServiceTests.testOtherSuccessfulStatus),
+          +	("testNonHTTPResponseStillWorks", FetchServiceTests.testNonHTTPResponseStillWorks),
+          +	("testHTTPErrorRejectsDecodableBody", FetchServiceTests.testHTTPErrorRejectsDecodableBody),
+          +	("testHTTPErrorTakesPriorityOverEmptyBody", FetchServiceTests.testHTTPErrorTakesPriorityOverEmptyBody),
+          +	("testEmptySuccessResponse", FetchServiceTests.testEmptySuccessResponse),
+          +	("testMalformedJSON", FetchServiceTests.testMalformedJSON),
+          +	("testTransportError", FetchServiceTests.testTransportError)
+          +])])
+          diff --git a/docs/redesign.md b/docs/redesign.md
+          new file mode 100644
+          index 0000000..1067230
+          --- /dev/null
+          +++ b/docs/redesign.md
+          @@ -0,0 +1,42 @@
+          +# Feather interface refresh
+          +
+          +The library, sources, and settings now share rounded cards, semantic system
+          +colors, a subtle accent wash, and rounded dashboard typography. The user's
+          +chosen tint and light/dark appearance continue to drive the interface.
+          +
+          +- Library: live signed/imported counts, a prominent import menu, larger app
+          +  icons, separate version and bundle identifier labels, and an inline empty state.
+          +- Sources: repository count, a browse-all card, quieter host-only source labels,
+          +  and an inline empty state that distinguishes searching from initial setup.
+          +- Settings: a matching overview showing the stored certificate count.
+          +- Actions: minimum 44-point signing/install pills; expired and revoked states
+          +  retain their status colors. At accessibility text sizes, library actions move
+          +  beneath the app description.
+          +- Navigation: updated SF Symbols while keeping the existing tabs and iPad sidebar.
+          +
+          +The existing import, sign, install, update, swipe, context-menu, and bulk-selection
+          +handlers remain connected to their original actions. New interface text uses
+          +the project's localization lookup and falls back to English where untranslated.
+          +The existing string catalog has not been edited by hand.
+          +
+          +## Validation
+          +
+          +Local checks: `git diff --check`, regression runner shell syntax, workflow YAML,
+          +and patch applicability. This Linux workspace has neither Swift nor Xcode;
+          +Swift compilation, runtime tests, and rendered iOS verification remain pending.
+          +
+          +On macOS with the project's supported Xcode and checked-out submodules:
+          +
+          +```sh
+          +bash scripts/test-nimble-json.sh
+          +xcodebuild -project Feather.xcodeproj -scheme Feather \
+          +  -configuration Debug -destination 'generic/platform=iOS' \
+          +  CODE_SIGNING_ALLOWED=NO build
+          +```
+          +
+          +Open `FRDesign.swift` in Xcode for light, dark, and accessibility-size component
+          +previews. Before distributing an IPA, check populated and empty libraries,
+          +search with no matches, each search scope, long app names, selection/deletion,
+          +certificate expiration and revocation, source navigation, and custom accents
+          +on both compact iPhone and regular iPad layouts. Component previews are not
+          +screenshots of a running Feather build.
+          diff --git a/scripts/test-nimble-json.sh b/scripts/test-nimble-json.sh
+          new file mode 100644
+          index 0000000..0f4ab2b
+          --- /dev/null
+          +++ b/scripts/test-nimble-json.sh
+          @@ -0,0 +1,10 @@
+          +#!/usr/bin/env bash
+          +set -euo pipefail
+          +repo_root="$(cd "$(dirname "$0")/.." && pwd)"
+          +test_directory="$(mktemp -d)"
+          +trap 'rm -rf "$test_directory"' EXIT
+          +xcrun swiftc -swift-version 5 \
+          +  "$repo_root/NimbleKit/Sources/NimbleJSON/NBFetchService.swift" \
+          +  "$repo_root/NimbleKit/Tests/NimbleJSONRegression/main.swift" \
+          +  -o "$test_directory/nimble-json-tests"
+          +"$test_directory/nimble-json-tests"
+          FEATHER_PATCH
+      - name: Build iPhone IPA
+        run: make iphoneos
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Feather-redesign-IPA
+          path: packages/Feather.ipa
+          if-no-files-found: error
