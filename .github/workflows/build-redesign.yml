@@ -875,6 +875,9 @@ jobs:
           +  -o "$test_directory/nimble-json-tests"
           +"$test_directory/nimble-json-tests"
           FEATHER_PATCH
+      - uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: "26.3"
       - name: Build iPhone IPA
         run: make iphoneos
       - uses: actions/upload-artifact@v4
