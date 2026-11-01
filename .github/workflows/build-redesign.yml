@@ -879,7 +879,9 @@ jobs:
         with:
           xcode-version: "26.3"
       - name: Build iPhone IPA
-        run: make iphoneos
+        run: |
+          find . -name Package.resolved -delete
+          make iphoneos
       - uses: actions/upload-artifact@v4
         with:
           name: Feather-redesign-IPA
