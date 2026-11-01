@@ -50,81 +50,75 @@ jobs:
           +      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
           +      - name: Test HTTP response handling without network access
           +        run: bash scripts/test-nimble-json.sh
+          diff --git a/Feather/FeatherApp.swift b/Feather/FeatherApp.swift
+          index 706286b..3072d51 100644
+          --- a/Feather/FeatherApp.swift
+          +++ b/Feather/FeatherApp.swift
+          @@ -12,6 +12,7 @@ import OSLog
+           
+           @main
+           struct FeatherApp: App {
+          +    @AppStorage("Feather.userTintColor") private var mistTint = "#7563C5"
+           	@UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
+           	
+           	let heartbeat = HeartbeatManager.shared
+          @@ -29,6 +30,7 @@ struct FeatherApp: App {
+           					.onOpenURL(perform: _handleURL)
+           					.transition(.move(edge: .top).combined(with: .opacity))
+           			}
+          +            .tint(Color(hex: mistTint))
+           			.animation(.smooth, value: downloadManager.manualDownloads.description)
+           			.onReceive(NotificationCenter.default.publisher(for: .heartbeatInvalidHost)) { _ in
+           				DispatchQueue.main.async {
+          @@ -44,7 +46,7 @@ struct FeatherApp: App {
+           					UIApplication.topViewController()?.view.window?.overrideUserInterfaceStyle = style
+           				}
+           				
+          -				UIApplication.topViewController()?.view.window?.tintColor = UIColor(Color(hex: UserDefaults.standard.string(forKey: "Feather.userTintColor") ?? "#848ef9"))
+          +				UIApplication.topViewController()?.view.window?.tintColor = UIColor(Color(hex: UserDefaults.standard.string(forKey: "Feather.userTintColor") ?? "#7563C5"))
+           			}
+           		}
+           	}
+          diff --git a/Feather/Views/Common/FRAppIconView.swift b/Feather/Views/Common/FRAppIconView.swift
+          index e48f3d0..3780472 100644
+          --- a/Feather/Views/Common/FRAppIconView.swift
+          +++ b/Feather/Views/Common/FRAppIconView.swift
+          @@ -73,7 +73,7 @@ struct FRAppIconView: View {
+           	@Environment(\.colorScheme) private var colorScheme
+           	@StateObject private var loader = FRAppIconLoader()
+           	
+          -	@AppStorage("Feather.userTintColor") private var selectedColorHex: String = "#848ef9"
+          +	@AppStorage("Feather.userTintColor") private var selectedColorHex: String = "#7563C5"
+           	@AppStorage("Feather.shouldTintIcons") private var shouldTintIcons: Bool = false
+           	@AppStorage("Feather.shouldChangeIconsBasedOffStyle") private var shouldChangeIconsBasedOffStyle: Bool = false
+           	
           diff --git a/Feather/Views/Common/FRDesign.swift b/Feather/Views/Common/FRDesign.swift
           new file mode 100644
-          index 0000000..931536d
+          index 0000000..9bd5caa
           --- /dev/null
           +++ b/Feather/Views/Common/FRDesign.swift
-          @@ -0,0 +1,135 @@
+          @@ -0,0 +1,56 @@
           +import SwiftUI
           +
-          +// Semantic system colors preserve the user's appearance and accent settings.
+          +// Mist surfaces adapt to appearance without overriding the user's preference.
+          +enum FRMist {
+          +    static let background = Color(uiColor: UIColor { traits in
+          +        traits.userInterfaceStyle == .dark
+          +            ? UIColor(red: 0.075, green: 0.075, blue: 0.105, alpha: 1)
+          +            : UIColor(red: 0.955, green: 0.953, blue: 0.978, alpha: 1)
+          +    })
+          +}
           +struct FRCardStyle: ViewModifier {
           +	@Environment(\.colorSchemeContrast) private var contrast
           +
           +	func body(content: Content) -> some View {
           +		content
           +			.background(Color(uiColor: .secondarySystemGroupedBackground))
-          +			.clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+          +			.clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
           +			.overlay {
-          +				RoundedRectangle(cornerRadius: 22, style: .continuous)
-          +					.strokeBorder(Color.primary.opacity(contrast == .increased ? 0.35 : 0.08))
+          +				RoundedRectangle(cornerRadius: 24, style: .continuous)
+          +					.strokeBorder(Color.primary.opacity(contrast == .increased ? 0.35 : 0.045))
           +			}
-          +	}
-          +}
-          +
-          +struct FRDashboardView: View {
-          +	let title: String
-          +	let subtitle: String
-          +	let symbol: String
-          +	let statistics: [(title: String, value: Int)]
-          +
-          +	var body: some View {
-          +		VStack(alignment: .leading, spacing: 20) {
-          +			Image(systemName: symbol)
-          +				.font(.title2.weight(.semibold))
-          +				.foregroundStyle(Color.accentColor)
-          +				.padding(13)
-          +				.background(Color.accentColor.opacity(0.12), in: RoundedRectangle(cornerRadius: 17))
-          +				.accessibilityHidden(true)
-          +
-          +			VStack(alignment: .leading, spacing: 6) {
-          +				Text(title)
-          +					.font(.system(.title, design: .rounded, weight: .bold))
-          +					.foregroundStyle(.primary)
-          +				Text(subtitle)
-          +					.font(.subheadline)
-          +					.foregroundStyle(.secondary)
-          +					.fixedSize(horizontal: false, vertical: true)
-          +			}
-          +
-          +			ViewThatFits(in: .horizontal) {
-          +				HStack(alignment: .top, spacing: 24) { _statistics }
-          +				VStack(alignment: .leading, spacing: 12) { _statistics }
-          +			}
-          +		}
-          +		.frame(maxWidth: .infinity, alignment: .leading)
-          +		.padding(22)
-          +		.background {
-          +			LinearGradient(colors: [Color.accentColor.opacity(0.09), .clear],
-          +			               startPoint: .topTrailing, endPoint: .bottomLeading)
-          +		}
-          +		.modifier(FRCardStyle())
-          +	}
-          +
-          +	private var _statistics: some View {
-          +		ForEach(statistics.indices, id: \.self) { index in
-          +			VStack(alignment: .leading, spacing: 3) {
-          +				Text(statistics[index].value, format: .number)
-          +					.font(.system(.title2, design: .rounded, weight: .bold))
-          +					.monospacedDigit()
-          +				Text(statistics[index].title)
-          +					.font(.caption.weight(.medium))
-          +					.foregroundStyle(.secondary)
-          +			}
-          +			.fixedSize()
-          +			.accessibilityElement(children: .combine)
-          +		}
           +	}
           +}
           +
@@ -160,42 +154,11 @@ jobs:
           +	}
           +}
           +
-          +#if DEBUG
-          +struct FRDesign_Previews: PreviewProvider {
-          +	static var previews: some View {
-          +		Group {
-          +			_preview.preferredColorScheme(.light).previewDisplayName("Light")
-          +			_preview.preferredColorScheme(.dark).previewDisplayName("Dark")
-          +			_preview.dynamicTypeSize(.accessibility3).previewDisplayName("Large text")
-          +		}
-          +	}
-          +
-          +	private static var _preview: some View {
-          +		ScrollView {
-          +			VStack(spacing: 16) {
-          +				FRDashboardView(
-          +					title: "Your apps, organized.",
-          +					subtitle: "Import, sign, and install in one place.",
-          +					symbol: "square.stack.3d.up.fill",
-          +					statistics: [("Signed", 12), ("Imported", 4)]
-          +				)
-          +				FREmptyStateView(
-          +					title: "No Apps",
-          +					message: "Get started by importing your first IPA file.",
-          +					symbol: "square.and.arrow.down"
-          +				) { Button("Import") {} }
-          +			}
-          +			.padding()
-          +		}
-          +		.background(Color(uiColor: .systemGroupedBackground))
-          +	}
-          +}
-          +#endif
           diff --git a/Feather/Views/Common/FRExpirationPillView.swift b/Feather/Views/Common/FRExpirationPillView.swift
-          index fa8ba1e..ee1c8b3 100644
+          index fa8ba1e..d41e209 100644
           --- a/Feather/Views/Common/FRExpirationPillView.swift
           +++ b/Feather/Views/Common/FRExpirationPillView.swift
-          @@ -18,20 +18,21 @@ struct FRExpirationPillView: View {
+          @@ -18,20 +18,26 @@ struct FRExpirationPillView: View {
            			? .localized("Revoked")
            			: expiration?.formatted ?? title
            		
@@ -209,9 +172,16 @@ jobs:
           -			: expiration?.color.opacity(0.85) ?? Color(uiColor: .quaternarySystemFill)
           +			: expiration?.color.opacity(0.85) ?? Color.accentColor.opacity(0.12)
            		
-           		Text(textLabel)
-           			.lineLimit(0)
+          -		Text(textLabel)
+          -			.lineLimit(0)
           -			.font(.headline.bold())
+          +		VStack(spacing: 2) {
+          +            Text(title)
+          +            if expiration != nil || revoked {
+          +                Text(textLabel).font(.caption2)
+          +            }
+          +        }
+          +            .fixedSize(horizontal: false, vertical: true)
           +			.font(.subheadline.weight(.semibold))
            			.foregroundStyle(textForeground)
            			.padding(.horizontal, 12)
@@ -222,7 +192,7 @@ jobs:
            			.clipShape(Capsule())
            	}
           diff --git a/Feather/Views/Library/LibraryCellView.swift b/Feather/Views/Library/LibraryCellView.swift
-          index 9383261..2897b7b 100644
+          index 9383261..04a6d6a 100644
           --- a/Feather/Views/Library/LibraryCellView.swift
           +++ b/Feather/Views/Library/LibraryCellView.swift
           @@ -11,7 +11,7 @@ import NimbleViews
@@ -234,18 +204,27 @@ jobs:
            	@Environment(\.editMode) private var editMode
            	@ObservedObject private var updateManager = UpdateManager.shared
            	@State private var _signedUpdateConfirmation: AppUpdate?
-          @@ -48,7 +48,6 @@ struct LibraryCellView: View {
+          @@ -48,46 +48,53 @@ struct LibraryCellView: View {
            	
            	// MARK: Body
            	var body: some View {
           -		let isRegular = horizontalSizeClass != .compact
            		let isEditing = editMode?.wrappedValue == .active
            		
-           		HStack(spacing: 18) {
-          @@ -65,23 +64,34 @@ struct LibraryCellView: View {
-           			
-           			_appIcon(for: app)
-           			
+          -		HStack(spacing: 18) {
+          -			if isEditing {
+          -				Button {
+          -					_toggleSelection()
+          -				} label: {
+          -					Image(systemName: _isSelected ? "checkmark.circle.fill" : "circle")
+          -						.foregroundColor(_isSelected ? .accentColor : .secondary)
+          -						.font(.title2)
+          -				}
+          -				.buttonStyle(.borderless)
+          -			}
+          -			
+          -			_appIcon(for: app)
+          -			
           -			NBTitleWithSubtitleView(
           -				title: app.name ?? .localized("Unknown"),
           -				subtitle: _desc,
@@ -253,30 +232,9 @@ jobs:
           -			)
           -			
           -			if !isEditing {
-          +			VStack(alignment: .leading, spacing: 5) {
-          +				Text(app.name ?? .localized("Unknown"))
-          +					.font(.headline)
-          +					.foregroundStyle(.primary)
-          +				Text(app.version ?? .localized("Unknown"))
-          +					.font(.subheadline.weight(.medium))
-          +					.foregroundStyle(.secondary)
-          +				if let identifier = app.identifier {
-          +					Text(identifier)
-          +						.font(.caption)
-          +						.foregroundStyle(.secondary)
-          +						.lineLimit(2)
-          +						.truncationMode(.middle)
-          +				}
-          +				if !isEditing && dynamicTypeSize.isAccessibilitySize {
-          +					_buttonActions(for: app).padding(.top, 6)
-          +				}
-          +			}
-          +			.frame(maxWidth: .infinity, alignment: .leading)
-          +
-          +			if !isEditing && !dynamicTypeSize.isAccessibilitySize {
-           				_buttonActions(for: app)
-           			}
-           		}
+          -				_buttonActions(for: app)
+          -			}
+          -		}
           -		.padding(isRegular ? 12 : 0)
           -		.background(
           -			isRegular
@@ -284,14 +242,60 @@ jobs:
           -				.fill(_isSelected && isEditing ? Color.accentColor.opacity(0.1) : Color(.quaternarySystemFill))
           -				: nil
           -		)
+          +        VStack(alignment: .leading, spacing: 14) {
+          +            HStack(alignment: .top) {
+          +                _appIcon(for: app)
+          +                Spacer(minLength: 4)
+          +                if isEditing {
+          +                    Button { _toggleSelection() } label: {
+          +                        Image(systemName: _isSelected ? "checkmark.circle.fill" : "circle")
+          +                            .font(.title2).foregroundStyle(Color.accentColor)
+          +                            .frame(width: 44, height: 44)
+          +                    }
+          +                    .buttonStyle(.plain)
+          +                    .accessibilityLabel(app.name ?? .localized("Unknown"))
+          +                    .accessibilityValue(_isSelected ? .localized("Selected") : .localized("Select"))
+          +                } else {
+          +                    Menu {
+          +                        _contextActions(for: app)
+          +                        _contextActionsExtra(for: app)
+          +                        Divider()
+          +                        _actions(for: app)
+          +                    } label: {
+          +                        Image(systemName: "ellipsis").frame(width: 44, height: 44)
+          +                    }
+          +                    .accessibilityLabel(.localized("Get Info"))
+          +                }
+          +            }
+          +            VStack(alignment: .leading, spacing: 5) {
+          +                Text(app.name ?? .localized("Unknown"))
+          +                    .font(.headline).foregroundStyle(.primary).lineLimit(2)
+          +                Text(app.version ?? .localized("Unknown"))
+          +                    .font(.caption).foregroundStyle(.secondary)
+          +                Label(.localized(app.isSigned ? "Signed" : "Imported"),
+          +                      systemImage: app.isSigned ? "checkmark.seal.fill" : "tray")
+          +                    .font(.caption.weight(.medium)).foregroundStyle(Color.accentColor)
+          +            }
+          +            .frame(maxWidth: .infinity, minHeight: 72, alignment: .topLeading)
+          +            if !isEditing {
+          +                _buttonActions(for: app).frame(maxWidth: .infinity)
+          +            }
+          +        }
+          +        .frame(maxWidth: .infinity, alignment: .leading)
           +		.padding(16)
           +		.modifier(FRCardStyle())
           +		.listRowBackground(Color.clear)
           +		.listRowSeparator(.hidden)
            		.contentShape(Rectangle())
-           		.onTapGesture {
-           			if isEditing {
-          @@ -123,20 +133,13 @@ struct LibraryCellView: View {
+          -		.onTapGesture {
+          -			if isEditing {
+          -				_toggleSelection()
+          -			}
+          -		}
+           		.swipeActions {
+           			if !isEditing {
+           				_actions(for: app)
+          @@ -123,20 +130,13 @@ struct LibraryCellView: View {
            		}
            	}
            	
@@ -314,70 +318,119 @@ jobs:
            				if updateManager.update(for: app) != nil {
            					Image(systemName: "arrow.down.circle.fill")
           diff --git a/Feather/Views/Library/LibraryView.swift b/Feather/Views/Library/LibraryView.swift
-          index b9c3aee..c679473 100644
+          index b9c3aee..663d157 100644
           --- a/Feather/Views/Library/LibraryView.swift
           +++ b/Feather/Views/Library/LibraryView.swift
-          @@ -72,6 +72,48 @@ struct LibraryView: View {
+          @@ -11,6 +11,7 @@ import NimbleViews
+           
+           // MARK: - View
+           struct LibraryView: View {
+          +	@Environment(\.dynamicTypeSize) private var dynamicTypeSize
+           	@StateObject var downloadManager = DownloadManager.shared
+           	@StateObject var updateManager = UpdateManager.shared
+           	
+          @@ -71,76 +72,56 @@ struct LibraryView: View {
+           	// MARK: Body
            	var body: some View {
            		NBNavigationView(.localized("Library")) {
-           			NBListAdaptable {
-          +				if _searchText.isEmpty && _selectedScope == .all {
-          +					Section {
-          +						VStack(spacing: 12) {
-          +							FRDashboardView(
-          +								title: .localized("Your apps, organized."),
-          +								subtitle: .localized("Import, sign, and install in one place."),
-          +								symbol: "square.stack.3d.up.fill",
-          +								statistics: [
-          +									(.localized("Signed"), _signedApps.count),
-          +									(.localized("Imported"), _importedApps.count)
-          +								]
-          +							)
-          +							Menu { _importActions() } label: {
-          +								Label(.localized("Import"), systemImage: "plus.circle.fill")
-          +									.font(.headline)
-          +									.frame(maxWidth: .infinity, minHeight: 36)
-          +							}
-          +							.buttonStyle(.borderedProminent)
-          +							.controlSize(.large)
-          +						}
-          +						.listRowBackground(Color.clear)
-          +						.listRowSeparator(.hidden)
-          +					}
-          +				}
+          -			NBListAdaptable {
+          -				if
+          -					!_filteredSignedApps.isEmpty,
+          -					_selectedScope == .all || _selectedScope == .signed
+          -				{
+          -					NBSection(
+          -						.localized("Signed"),
+          -						secondary: _filteredSignedApps.count.description
+          -					) {
+          -						ForEach(_filteredSignedApps, id: \.uuid) { app in
+          -							LibraryCellView(
+          -								app: app,
+          -								selectedInfoAppPresenting: $_selectedInfoAppPresenting,
+          -								selectedSigningAppPresenting: $_selectedSigningAppPresenting,
+          -								selectedInstallAppPresenting: $_selectedInstallAppPresenting,
+          -								selectedAppUUIDs: $_selectedAppUUIDs
+          -							)
+          -							.compatMatchedTransitionSource(id: app.uuid ?? "", ns: _namespace)
+          -						}
+          -					}
+          -				}
+          -				
+          -				if
+          -					!_filteredImportedApps.isEmpty,
+          -					_selectedScope == .all || _selectedScope == .imported
+          -				{
+          -					NBSection(
+          -						.localized("Imported"),
+          -						secondary: _filteredImportedApps.count.description
+          -					) {
+          -						ForEach(_filteredImportedApps, id: \.uuid) { app in
+          -							LibraryCellView(
+          -								app: app,
+          -								selectedInfoAppPresenting: $_selectedInfoAppPresenting,
+          -								selectedSigningAppPresenting: $_selectedSigningAppPresenting,
+          -								selectedInstallAppPresenting: $_selectedInstallAppPresenting,
+          -								selectedAppUUIDs: $_selectedAppUUIDs
+          -							)
+          -							.compatMatchedTransitionSource(id: app.uuid ?? "", ns: _namespace)
+          -						}
+          -					}
+          -				}
+          -			}
+          -			.searchable(text: $_searchText, placement: .platform())
+          -			.compatSearchScopes($_selectedScope) {
+          -				ForEach(Scope.allCases, id: \.displayName) { scope in
+          -					Text(scope.displayName).tag(scope)
+          -				}
+          -			}
+          +            ScrollView {
+          +                VStack(alignment: .leading, spacing: 22) {
+          +                    HStack {
+          +                        Text("Feather · Mist").font(.subheadline.weight(.medium)).foregroundStyle(.secondary)
+          +                        Spacer()
+          +                        Menu { _importActions() } label: {
+          +                            Label(.localized("Import"), systemImage: "plus")
+          +                                .font(.subheadline.weight(.semibold))
+          +                                .padding(.horizontal, 16).frame(minHeight: 44)
+          +                        }
+          +                        .buttonStyle(.borderedProminent).clipShape(Capsule())
+          +                    }
+          +                    Picker(.localized("Library"), selection: $_selectedScope) {
+          +                        ForEach(Scope.allCases, id: \.self) { scope in
+          +                            Text(scope.displayName).tag(scope)
+          +                        }
+          +                    }
+          +                    .pickerStyle(.segmented)
           +
-          +				if _getAllApps().isEmpty {
-          +					Section {
-          +						FREmptyStateView(
-          +							title: .localized(_searchText.isEmpty ? "No Apps" : "No Results"),
-          +							message: .localized(_searchText.isEmpty
-          +								? "Get started by importing your first IPA file."
-          +								: "Try a different search or filter."),
-          +							symbol: _searchText.isEmpty ? "square.and.arrow.down" : "magnifyingglass"
-          +						) {
-          +							if _searchText.isEmpty {
-          +								Menu { _importActions() } label: { Text(.localized("Import")) }
-          +							}
-          +						}
-          +						.listRowBackground(Color.clear)
-          +						.listRowSeparator(.hidden)
-          +					}
-          +				}
-           				if
-           					!_filteredSignedApps.isEmpty,
-           					_selectedScope == .all || _selectedScope == .signed
-          @@ -114,6 +156,8 @@ struct LibraryView: View {
-           					}
-           				}
-           			}
-          +			.scrollContentBackground(.hidden)
-          +			.background(Color(uiColor: .systemGroupedBackground))
-           			.searchable(text: $_searchText, placement: .platform())
-           			.compatSearchScopes($_selectedScope) {
-           				ForEach(Scope.allCases, id: \.displayName) { scope in
-          @@ -121,26 +165,6 @@ struct LibraryView: View {
-           				}
-           			}
+          +                    if _getAllApps().isEmpty {
+          +                        FREmptyStateView(
+          +                            title: .localized(_searchText.isEmpty ? "No Apps" : "No Results"),
+          +                            message: .localized(_searchText.isEmpty
+          +                                ? "Get started by importing your first IPA file."
+          +                                : "Try a different search or filter."),
+          +                            symbol: _searchText.isEmpty ? "square.and.arrow.down" : "magnifyingglass"
+          +                        ) {
+          +                            if _searchText.isEmpty {
+          +                                Menu { _importActions() } label: { Text(.localized("Import")) }
+          +                            }
+          +                        }
+          +                    }
+          +                    LazyVGrid(columns: [GridItem(.adaptive(minimum: dynamicTypeSize.isAccessibilitySize ? 280 : 150), spacing: 14)], spacing: 14) {
+          +                        ForEach(_getAllApps(), id: \.uuid) { app in
+          +                            LibraryCellView(
+          +                                app: app,
+          +                                selectedInfoAppPresenting: $_selectedInfoAppPresenting,
+          +                                selectedSigningAppPresenting: $_selectedSigningAppPresenting,
+          +                                selectedInstallAppPresenting: $_selectedInstallAppPresenting,
+          +                                selectedAppUUIDs: $_selectedAppUUIDs
+          +                            )
+          +                            .compatMatchedTransitionSource(id: app.uuid ?? "", ns: _namespace)
+          +                        }
+          +                    }
+          +                }
+          +                .padding(20)
+          +            }
+          +            .background(FRMist.background)
+          +            .searchable(text: $_searchText, placement: .platform())
            			.scrollDismissesKeyboard(.interactively)
           -			.overlay {
           -				if
@@ -402,27 +455,147 @@ jobs:
            			.toolbar {
            				ToolbarItem(placement: .topBarLeading) {
            					EditButton()
+          diff --git a/Feather/Views/Settings/Appearance/AppearanceTintColorView.swift b/Feather/Views/Settings/Appearance/AppearanceTintColorView.swift
+          index 115893d..71fc9e1 100644
+          --- a/Feather/Views/Settings/Appearance/AppearanceTintColorView.swift
+          +++ b/Feather/Views/Settings/Appearance/AppearanceTintColorView.swift
+          @@ -9,9 +9,9 @@ import SwiftUI
+           
+           // MARK: - View
+           struct AppearanceTintColorView: View {
+          -	@AppStorage("Feather.userTintColor") private var _selectedColorHex: String = "#848ef9"
+          +	@AppStorage("Feather.userTintColor") private var _selectedColorHex: String = "#7563C5"
+           	private let _tintOptions: [(name: String, hex: String)] = [
+          -		("Default", 		"#848ef9"),
+          +		("Default", 		"#7563C5"),
+           		("V2", 				"#B496DC"),
+           		("Berry",   		"#ff7a83"),
+           		("Cool Blue", 		"#4161F1"),
+          diff --git a/Feather/Views/Settings/Appearance/AppearanceView.swift b/Feather/Views/Settings/Appearance/AppearanceView.swift
+          index cba2bd0..e207c58 100644
+          --- a/Feather/Views/Settings/Appearance/AppearanceView.swift
+          +++ b/Feather/Views/Settings/Appearance/AppearanceView.swift
+          @@ -29,7 +29,7 @@ struct AppearanceView: View {
+           	]
+           	
+           	@AppStorage("Feather.userTintColor")
+          -	private var _selectedColorHex: String = "#848ef9"
+          +	private var _selectedColorHex: String = "#7563C5"
+           	
+           	private var _tintColorBinding: Binding<Color> {
+           		Binding(
           diff --git a/Feather/Views/Settings/SettingsView.swift b/Feather/Views/Settings/SettingsView.swift
-          index 2de8b28..299501f 100644
+          index 2de8b28..cae87cf 100644
           --- a/Feather/Views/Settings/SettingsView.swift
           +++ b/Feather/Views/Settings/SettingsView.swift
-          @@ -41,6 +41,16 @@ struct SettingsView: View {
-           	var body: some View {
-           		NBNavigationView(.localized("Settings")) {
-           			Form {
-          +				Section {
-          +					FRDashboardView(
-          +						title: .localized("Make it yours."),
-          +						subtitle: .localized("Your look. Your signing setup."),
-          +						symbol: "slider.horizontal.3",
-          +						statistics: [(.localized("Certificates"), _certificates.count)]
-          +					)
-          +					.listRowInsets(EdgeInsets())
-          +					.listRowBackground(Color.clear)
-          +				}
-           				#if !NIGHTLY && !DEBUG
+          @@ -45,8 +45,6 @@ struct SettingsView: View {
            					SettingsDonationCellView(site: _donationsUrl)
            				#endif
+                           
+          -				_feedback()
+          -                
+           				Section {
+           					NavigationLink(destination: AppearanceView()) {
+           						Label(.localized("Appearance"), systemImage: "paintbrush")
+          @@ -87,6 +85,7 @@ struct SettingsView: View {
+           					Text(.localized("Configure the apps way of installing, its zip compression levels, and custom modifications to apps."))
+           				}
+                           
+          +				_feedback()
+           				_directories()
+                           
+           				Section {
+          @@ -97,6 +96,8 @@ struct SettingsView: View {
+           					Text(.localized("Reset the applications sources, certificates, apps, and general contents."))
+           				}
+           			}
+          +            .scrollContentBackground(.hidden)
+          +            .background(FRMist.background)
+           		}
+           	}
+           }
+          diff --git a/Feather/Views/Signing/SigningView.swift b/Feather/Views/Signing/SigningView.swift
+          index 7972089..39f5782 100644
+          --- a/Feather/Views/Signing/SigningView.swift
+          +++ b/Feather/Views/Signing/SigningView.swift
+          @@ -45,46 +45,32 @@ struct SigningView: View {
+           		
+           	// MARK: Body
+           	var body: some View {
+          -		NBNavigationView("", displayMode: .inline) {
+          +		NBNavigationView(.localized("Signing"), displayMode: .inline) {
+           			Form {
+           				_customizationOptions(for: app)
+           				_cert()
+           				_customizationProperties(for: app)
+           				
+          -				// horrible
+          -				Rectangle()
+          -					.foregroundStyle(.clear)
+          -					.frame(height: 30)
+          -					.listRowBackground(EmptyView())
+          -			}
+          -			.overlay {
+          -				VStack(spacing: 0) {
+          -					Spacer()
+          -					NBVariableBlurView()
+          -						.frame(height: UIDevice.current.userInterfaceIdiom == .pad ? 60 : 80)
+          -						.rotationEffect(.degrees(180))
+          -						.overlay {
+          -							Button {
+          -								_start()
+          -							} label: {
+          -								NBSheetButton(title: .localized("Start Signing"), style: .prominent)
+          -									.padding()
+          -							}
+          -							.buttonStyle(.plain)
+          -							.offset(y: UIDevice.current.userInterfaceIdiom == .pad ? -20 : -40)
+          -						}
+          -				}
+          -				.ignoresSafeArea(edges: .bottom)
+          -			}
+          +            }
+          +            .scrollContentBackground(.hidden)
+          +            .background(FRMist.background)
+          +            .safeAreaInset(edge: .bottom) {
+          +                Button { _start() } label: {
+          +                    HStack(spacing: 10) {
+          +                        if _isSigning { ProgressView().tint(.white) }
+          +                        Label(.localized("Start Signing"), systemImage: "signature")
+          +                            .font(.headline)
+          +                    }
+          +                    .frame(maxWidth: .infinity, minHeight: 48)
+          +                }
+          +                .buttonStyle(.borderedProminent)
+          +                .clipShape(RoundedRectangle(cornerRadius: 18))
+          +                .padding(.horizontal, 20).padding(.vertical, 12)
+          +                .background(.regularMaterial)
+          +            }
+           
+           			.toolbar {
+           				NBToolbarButton(role: .dismiss)
+          -				ToolbarItem(placement: .principal) {
+          -					Image("Glyph")
+          -						.resizable()
+          -						.scaledToFit()
+          -						.frame(height: 38)
+          -				}
+           				NBToolbarButton(
+           					.localized("Reset"),
+           					style: .text,
+          @@ -201,9 +187,9 @@ extension SigningView {
+           					)
+           				}
+           			} else {
+          -				Text(.localized("No Certificate"))
+          -					.font(.footnote)
+          -					.foregroundColor(.disabled())
+          +				NavigationLink(destination: CertificatesView(selectedCert: $_temporaryCertificate)) {
+          +                    Label(.localized("No Certificate"), systemImage: "plus.circle")
+          +                }
+           			}
+           		}
+           	}
           diff --git a/Feather/Views/Sources/SourcesCellView.swift b/Feather/Views/Sources/SourcesCellView.swift
           index 504ac12..81896d8 100644
           --- a/Feather/Views/Sources/SourcesCellView.swift
@@ -463,7 +636,7 @@ jobs:
            			_actions(for: source)
            			_contextActions(for: source)
           diff --git a/Feather/Views/Sources/SourcesView.swift b/Feather/Views/Sources/SourcesView.swift
-          index 766cafb..59c60e9 100644
+          index 766cafb..6d4eb31 100644
           --- a/Feather/Views/Sources/SourcesView.swift
           +++ b/Feather/Views/Sources/SourcesView.swift
           @@ -12,7 +12,6 @@ import NimbleViews
@@ -474,22 +647,10 @@ jobs:
            	#if !NIGHTLY && !DEBUG
            		@AppStorage("Feather.shouldStar") private var _shouldStar: Int = 0
            	#endif
-          @@ -35,28 +34,59 @@ struct SourcesView: View {
+          @@ -35,28 +34,47 @@ struct SourcesView: View {
            	var body: some View {
            		NBNavigationView(.localized("Sources")) {
            			NBListAdaptable {
-          +				if _searchText.isEmpty {
-          +					Section {
-          +						FRDashboardView(
-          +							title: .localized("Discover your next app."),
-          +							subtitle: .localized("All your trusted sources, together."),
-          +							symbol: "globe",
-          +							statistics: [(.localized("Repositories"), _sources.count)]
-          +						)
-          +						.listRowBackground(Color.clear)
-          +						.listRowSeparator(.hidden)
-          +					}
-          +				}
           +
           +				if _filteredSources.isEmpty {
           +					Section {
@@ -548,7 +709,7 @@ jobs:
            					}
            					
            					NBSection(
-          @@ -70,28 +100,15 @@ struct SourcesView: View {
+          @@ -70,28 +88,15 @@ struct SourcesView: View {
            								SourcesCellView(source: source)
            							}
            							.buttonStyle(.plain)
@@ -559,7 +720,7 @@ jobs:
            				}
            			}
           +			.scrollContentBackground(.hidden)
-          +			.background(Color(uiColor: .systemGroupedBackground))
+          +			.background(FRMist.background)
            			.searchable(text: $_searchText, placement: .platform())
           -			.overlay {
           -				if _filteredSources.isEmpty {
@@ -581,8 +742,21 @@ jobs:
            			.toolbar {
            				NBToolbarButton(
            					systemImage: "plus",
+          diff --git a/Feather/Views/TabView/Bars/TabbarView.swift b/Feather/Views/TabView/Bars/TabbarView.swift
+          index 064d989..3a067bf 100644
+          --- a/Feather/Views/TabView/Bars/TabbarView.swift
+          +++ b/Feather/Views/TabView/Bars/TabbarView.swift
+          @@ -8,7 +8,7 @@
+           import SwiftUI
+           
+           struct TabbarView: View {
+          -	@State private var selectedTab: TabEnum = .sources
+          +	@State private var selectedTab: TabEnum = .library
+           
+           	var body: some View {
+           		TabView(selection: $selectedTab) {
           diff --git a/Feather/Views/TabView/TabEnum.swift b/Feather/Views/TabView/TabEnum.swift
-          index 91c17fc..b9006fe 100644
+          index 91c17fc..594db15 100644
           --- a/Feather/Views/TabView/TabEnum.swift
           +++ b/Feather/Views/TabView/TabEnum.swift
           @@ -25,9 +25,9 @@ enum TabEnum: String, CaseIterable, Hashable {
@@ -593,10 +767,20 @@ jobs:
           -		case .library: 		return "square.grid.2x2"
           -		case .settings: 	return "gearshape.2"
           +		case .sources: 		return "globe"
-          +		case .library: 		return "square.stack.3d.up.fill"
+          +		case .library: 		return "square.grid.2x2.fill"
           +		case .settings: 	return "slider.horizontal.3"
            		case .certificates: return "person.text.rectangle"
            		}
+           	}
+          @@ -44,8 +44,8 @@ enum TabEnum: String, CaseIterable, Hashable {
+           	
+           	static var defaultTabs: [TabEnum] {
+           		return [
+          -			.sources,
+           			.library,
+          +			.sources,
+           			.settings
+           		]
            	}
           diff --git a/NimbleKit/Sources/NimbleJSON/NBFetchService.swift b/NimbleKit/Sources/NimbleJSON/NBFetchService.swift
           index 9bfc6cb..f6a63a2 100644
@@ -812,52 +996,19 @@ jobs:
           +])])
           diff --git a/docs/redesign.md b/docs/redesign.md
           new file mode 100644
-          index 0000000..1067230
+          index 0000000..716bc16
           --- /dev/null
           +++ b/docs/redesign.md
-          @@ -0,0 +1,42 @@
-          +# Feather interface refresh
+          @@ -0,0 +1,9 @@
+          +# Feather Mist
           +
-          +The library, sources, and settings now share rounded cards, semantic system
-          +colors, a subtle accent wash, and rounded dashboard typography. The user's
-          +chosen tint and light/dark appearance continue to drive the interface.
+          +The chosen Mist direction replaces the first dashboard redesign with an adaptive app grid, persistent scope filter, white rounded surfaces on a cool lavender background, and a muted violet default tint. Saved appearance preferences remain respected; dark appearance uses dark surfaces.
           +
-          +- Library: live signed/imported counts, a prominent import menu, larger app
-          +  icons, separate version and bundle identifier labels, and an inline empty state.
-          +- Sources: repository count, a browse-all card, quieter host-only source labels,
-          +  and an inline empty state that distinguishes searching from initial setup.
-          +- Settings: a matching overview showing the stored certificate count.
-          +- Actions: minimum 44-point signing/install pills; expired and revoked states
-          +  retain their status colors. At accessibility text sizes, library actions move
-          +  beneath the app description.
-          +- Navigation: updated SF Symbols while keeping the existing tabs and iPad sidebar.
+          +Library retains import, search, bulk selection/deletion, updates, signing, installation, export, and per-app menus. Large accessibility text uses a single-column grid. Action buttons always name their action, with certificate validity as secondary text.
           +
-          +The existing import, sign, install, update, swipe, context-menu, and bulk-selection
-          +handlers remain connected to their original actions. New interface text uses
-          +the project's localization lookup and falls back to English where untranslated.
-          +The existing string catalog has not been edited by hand.
+          +Sources removes the oversized promotional header. Settings groups appearance, certificates, and signing features before feedback. Signing uses a safe-area action bar instead of a manually positioned blur overlay; the empty certificate row opens certificate management.
           +
-          +## Validation
-          +
-          +Local checks: `git diff --check`, regression runner shell syntax, workflow YAML,
-          +and patch applicability. This Linux workspace has neither Swift nor Xcode;
-          +Swift compilation, runtime tests, and rendered iOS verification remain pending.
-          +
-          +On macOS with the project's supported Xcode and checked-out submodules:
-          +
-          +```sh
-          +bash scripts/test-nimble-json.sh
-          +xcodebuild -project Feather.xcodeproj -scheme Feather \
-          +  -configuration Debug -destination 'generic/platform=iOS' \
-          +  CODE_SIGNING_ALLOWED=NO build
-          +```
-          +
-          +Open `FRDesign.swift` in Xcode for light, dark, and accessibility-size component
-          +previews. Before distributing an IPA, check populated and empty libraries,
-          +search with no matches, each search scope, long app names, selection/deletion,
-          +certificate expiration and revocation, source navigation, and custom accents
-          +on both compact iPhone and regular iPad layouts. Component previews are not
-          +screenshots of a running Feather build.
+          +Validation: device Release build via GitHub Actions. Runtime appearance, VoiceOver, and installation still require device/simulator checks. The IPA needs a user's signing certificate before installation.
           diff --git a/scripts/test-nimble-json.sh b/scripts/test-nimble-json.sh
           new file mode 100644
           index 0000000..0f4ab2b
@@ -884,6 +1035,6 @@ jobs:
           make iphoneos
       - uses: actions/upload-artifact@v4
         with:
-          name: Feather-redesign-IPA
+          name: Feather-Mist-IPA
           path: packages/Feather.ipa
           if-no-files-found: error
